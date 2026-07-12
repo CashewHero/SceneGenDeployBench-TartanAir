@@ -1,0 +1,49 @@
+catalog_version: 1
+
+runners:
+  - runner: tartanair
+    version: 0.1.0
+    latest: true
+    display_name: TartanAir Dataset Downloader
+    kind: dataset_downloader
+    contract_version: 1
+    inputs:
+      required: []
+    job_parameters:
+      mode: equirectangular
+      env: []
+      difficulty:
+        - easy
+      modality:
+        - image
+        - depth
+      camera: left
+      trajectory: all
+      download_workers: 2
+      pano_width: 2560
+      pano_height: 1280
+      pano_convert_workers: 4
+      pano_png_compression: 9
+      pano_cuda: true
+    scheduling:
+      max_batch_size: 1
+      max_attempts: 3
+      job_timeout_minutes: 1440
+      startup_timeout_minutes: 10
+      allowed_windows:
+        - start: "00:00"
+          end: "24:00"
+          start_policy: open
+          end_policy: finish_job
+    launcher:
+      driver: docker
+      compat_version: 1
+      image: ghcr.io/cashewhero/scenegendeploybench-tartanair:0.1.0
+      gpus: all
+      endpoint:
+        port: 58090
+      env:
+        HF_HUB_DISABLE_XET: "1"
+      env_passthrough:
+        - HF_HOME
+        - HF_TOKEN
