@@ -12,7 +12,7 @@ This repository wraps the TartanAir download and cube-to-panorama conversion pip
 - Dataset output: `/data/datasets/<dataset>`
 - Job output: `/data/output/tartanair@0.1.0/<dataset>/<timestamp>_<id>`
 
-Each job writes `runner.log` and `metrics.json` to the normal job output folder. Downloads and conversion use `runtime.temp_dir` first; only the validated final dataset tree is published under `runtime.dataset_dir` with a DeployBench-compatible `manifest.yaml`.
+Each job writes `runner.log` and `metrics.json` to the normal job output folder. The orchestrator supplies the dataset name in `job.parameters.dataset_name`; the runner publishes the validated dataset under `PATH_DATASETS/<dataset>` with a DeployBench-compatible `manifest.yaml`. Per-job staging stays under `/tmp`.
 
 Manifests include `metadata.dataset_owner: SceneGenDeployBench-TartanAir`. The runner only appends to empty dataset folders or sets with this owner.
 

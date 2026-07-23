@@ -69,19 +69,22 @@ def run_job(job_request: dict[str, Any]) -> dict[str, Any]:
     started_at = time.time()
     job = job_request["job"]
     runtime = job_request["runtime"]
-    config = job_request.get("config") or {}
     params = dict(job.get("parameters") or {})
 
     output_dir = Path(runtime["output_dir"])
-    dataset_dir = Path(runtime["dataset_dir"])
-    temp_dir = Path(runtime["temp_dir"])
+    dataset_name = str(params.get("dataset_name") or "").strip()
+    if not dataset_name:
+        raise ValueError("job.parameters.dataset_name is required")
+
+    datasets_root = Path(os.environ["PATH_DATASETS"])
+    dataset_dir = datasets_root / dataset_name
+    temp_dir = Path("/tmp") / str(job["job_id"]) / "tartanair"
     output_dir.mkdir(parents=True, exist_ok=True)
     dataset_dir.parent.mkdir(parents=True, exist_ok=True)
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     log_path = output_dir / "runner.log"
     metrics_path = output_dir / "metrics.json"
-    dataset_name = str(config.get("dataset_name") or dataset_dir.name)
 
     _job_log(log_path, f"TartanAir dataset download started: {job['job_id']}")
     command = _build_command(
@@ -115,12 +118,14 @@ def run_job(job_request: dict[str, Any]) -> dict[str, Any]:
     _write_json(
         metrics_path,
         {
-            "dataset_name": dataset_name,
-            "dataset_dir": str(dataset_dir),
-            "manifest": str(manifest_path),
             "parameters": params,
+            "dataset": {
+                "name": dataset_name,
+                "path": str(dataset_dir),
+                "manifest": str(manifest_path),
+            },
             "pipeline": pipeline_summary,
-            "metrics": metrics,
+            "resource_metrics": metrics,
         },
     )
     _job_log(log_path, f"TartanAir dataset download completed in {wall_time_ms} ms")
@@ -133,17 +138,11 @@ def run_job(job_request: dict[str, Any]) -> dict[str, Any]:
         "artifacts": [
             {
                 "artifact_type": "job_log",
-                "role": "stdout",
                 "path": "runner.log",
-                "format": "text",
-                "size_bytes": log_path.stat().st_size,
             },
             {
                 "artifact_type": "metric_summary",
-                "role": "summary",
                 "path": "metrics.json",
-                "format": "json",
-                "size_bytes": metrics_path.stat().st_size,
             },
         ],
         "failure": None,

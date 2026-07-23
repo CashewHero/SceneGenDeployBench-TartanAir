@@ -8,7 +8,8 @@ runners:
     kind: dataset_downloader
     contract_version: 1
     inputs:
-      required: []
+      data:
+        required: []
     job_parameters:
       mode: equirectangular
       env: []

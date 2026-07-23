@@ -13,9 +13,12 @@ It exposes the DeployBench runner HTTP endpoints and calls `runner_wrapper.adapt
 The orchestrator provides:
 
 - `runtime.output_dir`: write `runner.log` and `metrics.json`
-- `runtime.dataset_dir`: final dataset tree and `manifest.yaml` only
-- `runtime.temp_dir`: scratch space for downloads, unzip, and conversion staging
+- `PATH_DATASETS`: shared root for the final dataset tree and `manifest.yaml`
+- `job.parameters.dataset_name`: dataset folder name below `PATH_DATASETS`
+- `job.parameters.download_key`: orchestrator identity for this download request
 - `job.parameters`: catalog defaults merged with `deploybench dataset download --set key=value`
+
+Scratch downloads, unzip, and conversion staging use `/tmp/<job_id>/tartanair`. The request has no root `config` object and no downloader-specific runtime paths.
 
 The catalog provides default job parameters under:
 
@@ -23,7 +26,7 @@ The catalog provides default job parameters under:
 job_parameters:
 ```
 
-Command-line `--set` values override those parameters for one job. Supported parameters are flat: `mode`, `env`, `difficulty`, `modality`, `camera`, `trajectory`, `download_workers`, and pano_conversion `pano_*` keys.
+Command-line `--set` values override those parameters for one job. User-facing parameters are flat: `mode`, `env`, `difficulty`, `modality`, `camera`, `trajectory`, `download_workers`, and pano_conversion `pano_*` keys. The orchestrator adds `dataset_name` and `download_key`.
 
 Modes:
 
