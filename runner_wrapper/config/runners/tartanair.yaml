@@ -7,9 +7,7 @@ runners:
     display_name: TartanAir Dataset Downloader
     kind: dataset_downloader
     contract_version: 1
-    inputs:
-      data:
-        required: []
+    inputs: {}
     job_parameters:
       mode: equirectangular
       env: []
