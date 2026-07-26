@@ -2,7 +2,7 @@ catalog_version: 1
 
 runners:
   - runner: tartanair
-    version: 0.1.0
+    version: 0.1.1
     latest: true
     display_name: TartanAir Dataset Downloader
     kind: dataset_downloader
@@ -37,7 +37,7 @@ runners:
     launcher:
       driver: docker
       compat_version: 1
-      image: ghcr.io/cashewhero/scenegendeploybench-tartanair:0.1.0
+      image: ghcr.io/cashewhero/scenegendeploybench-tartanair:0.1.1
       gpus: all
       endpoint:
         port: 58090
