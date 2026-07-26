@@ -10,7 +10,7 @@ This repository wraps the TartanAir download and cube-to-panorama conversion pip
 - Kind: `dataset_downloader`
 - Image: `scenegendeploybench-tartanair`
 - Dataset output: `/data/datasets/<dataset>`
-- Job output: `/data/output/tartanair@0.1.1/<dataset>/<environment-or-group>`
+- Job output: `/data/output/tartanair@0.1.2/<dataset>/<environment-or-group>`
 
 Each job writes `runner_260724-153045.log` and `metrics_260724-153045.json`. The metrics file includes the pipeline summary. Multiple environments use a combined folder such as `AbandonedFactory2+Office`. The orchestrator supplies the dataset name in `job.parameters.dataset_name`; the runner publishes the validated dataset under `PATH_DATASETS/<dataset>` with a DeployBench-compatible `manifest.yaml`. Per-job staging stays under `/tmp`.
 
@@ -22,7 +22,7 @@ Manifests include `metadata.dataset_owner: SceneGenDeployBench-TartanAir`. The r
 docker build -f runner_wrapper/Dockerfile -t scenegendeploybench-tartanair:local .
 ```
 
-The image uses PyTorch 2.13.0 with CUDA 13.0. Panorama conversion uses standard PyTorch operations and falls back to CPU when CUDA is unavailable.
+The image uses PyTorch 2.13.0 with CUDA 12.6. Panorama conversion uses standard PyTorch operations and falls back to CPU when CUDA is unavailable.
 
 ## DeployBench Config
 
@@ -32,7 +32,7 @@ Then create a download job:
 
 ```bash
 deploybench dataset download tartanair-small \
-  --runner tartanair@0.1.1 \
+  --runner tartanair@0.1.2 \
   --set mode=equirectangular \
   --set env=AbandonedFactory2 \
   --set modality=image \

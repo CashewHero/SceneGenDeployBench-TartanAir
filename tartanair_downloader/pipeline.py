@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import shutil
-import os
-import json
 import fcntl
+import json
+import os
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from runner_wrapper.files import publish_directory
 from tartanair_downloader.config import DownloadConfig
 from tartanair_downloader.manifest import (
     DATASET_OWNER,
@@ -166,11 +167,11 @@ def _publish_dataset(staging_dir: Path, dataset_dir: Path, dataset_name: str) ->
             shutil.rmtree(publish_dir)
         if dataset_dir.exists():
             merge_stream_manifests(dataset_dir, staging_dir)
-            shutil.copytree(dataset_dir, publish_dir)
-            shutil.copytree(staging_dir, publish_dir, dirs_exist_ok=True)
+            publish_directory(dataset_dir, publish_dir)
+            publish_directory(staging_dir, publish_dir, dirs_exist_ok=True)
             rewrite_parent_manifests(publish_dir, dataset_name)
         else:
-            shutil.copytree(staging_dir, publish_dir)
+            publish_directory(staging_dir, publish_dir)
         if dataset_dir.exists():
             shutil.rmtree(dataset_dir)
         publish_dir.rename(dataset_dir)
