@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import fcntl
 import json
-import os
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,8 +11,7 @@ from runner_wrapper.files import publish_directory
 from tartanair_downloader.config import DownloadConfig
 from tartanair_downloader.manifest import (
     DATASET_OWNER,
-    merge_stream_manifests,
-    rewrite_parent_manifests,
+    merge_manifests,
     write_manifest,
 )
 from tartanair_downloader.tartanair_api import download
@@ -57,7 +55,7 @@ def _run_raw(
     sample_count = write_manifest(staging_dir, dataset_name, config)
     if sample_count <= 0:
         raise RuntimeError(f"TartanAir download produced no raw samples under {staging_dir}")
-    _publish_dataset(staging_dir, dataset_dir, dataset_name)
+    _publish_dataset(staging_dir, dataset_dir)
     return {
         "mode": "raw",
         "dataset_name": dataset_name,
@@ -83,7 +81,7 @@ def _run_pano_dataset(
         sample_count = write_manifest(staging_dir, dataset_name, config)
         if sample_count <= 0:
             raise RuntimeError(f"TartanAir download produced no pano samples under {staging_dir}")
-        _publish_dataset(staging_dir, dataset_dir, dataset_name)
+        _publish_dataset(staging_dir, dataset_dir)
         return {
             "mode": "equirectangular",
             "dataset_name": dataset_name,
@@ -106,7 +104,7 @@ def _run_pano_dataset(
     sample_count = write_manifest(converted_root, dataset_name, config, sequence_samples)
     if sample_count <= 0:
         raise RuntimeError(f"TartanAir cube conversion produced no pano samples under {converted_root}")
-    _publish_dataset(converted_root, dataset_dir, dataset_name)
+    _publish_dataset(converted_root, dataset_dir)
     if raw_root.exists():
         shutil.rmtree(raw_root)
         print(f"Deleted temporary raw cube data: {raw_root}", flush=True)
@@ -154,26 +152,18 @@ def _prune_staged_dataset(path: Path, config: DownloadConfig) -> None:
                     shutil.rmtree(trajectory_dir)
 
 
-def _publish_dataset(staging_dir: Path, dataset_dir: Path, dataset_name: str) -> None:
+def _publish_dataset(staging_dir: Path, dataset_dir: Path) -> None:
     if not (staging_dir / "manifest.yaml").is_file():
         raise FileNotFoundError(f"staged dataset manifest was not produced: {staging_dir / 'manifest.yaml'}")
 
     dataset_dir.parent.mkdir(parents=True, exist_ok=True)
     with _publish_lock(dataset_dir):
         _validate_publish_target(dataset_dir)
-        publish_dir = dataset_dir.parent / f".{dataset_dir.name}.publishing-{os.getpid()}"
-        if publish_dir.exists():
-            shutil.rmtree(publish_dir)
         if dataset_dir.exists():
-            merge_stream_manifests(dataset_dir, staging_dir)
-            publish_directory(dataset_dir, publish_dir)
-            publish_directory(staging_dir, publish_dir, dirs_exist_ok=True)
-            rewrite_parent_manifests(publish_dir, dataset_name)
+            merge_manifests(dataset_dir, staging_dir)
+            publish_directory(staging_dir, dataset_dir, dirs_exist_ok=True)
         else:
-            publish_directory(staging_dir, publish_dir)
-        if dataset_dir.exists():
-            shutil.rmtree(dataset_dir)
-        publish_dir.rename(dataset_dir)
+            publish_directory(staging_dir, dataset_dir)
     print(f"Published final dataset to {dataset_dir}", flush=True)
 
 

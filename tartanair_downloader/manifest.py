@@ -47,95 +47,20 @@ def write_manifest(
     return _write_stream_tree(dataset_dir, dataset_name, streams, tags)
 
 
-def rewrite_parent_manifests(dataset_dir: Path, dataset_name: str) -> int:
-    env_sequences: dict[str, dict[str, str]] = {}
-    data_types: set[str] = set()
-    total_streams = 0
-    has_raw = False
-    has_pano = False
-
-    for env_dir in sorted(path for path in dataset_dir.iterdir() if path.is_dir()):
-        for difficulty_dir in sorted(env_dir.glob("Data_*")):
-            difficulty = difficulty_dir.name.removeprefix("Data_")
-            for sequence_dir in sorted(path for path in difficulty_dir.iterdir() if path.is_dir()):
-                stream_subsets: dict[str, str] = {}
-                for stream_manifest in sorted(sequence_dir.glob("*.yaml")):
-                    if stream_manifest.name == "manifest.yaml":
-                        continue
-                    stream_name = stream_manifest.stem
-                    stream_subsets[stream_name] = stream_manifest.name
-                    has_pano = has_pano or stream_name.endswith(("_equirect", "_pano_conversion"))
-                    has_raw = has_raw or not stream_name.endswith(("_equirect", "_pano_conversion"))
-                if not stream_subsets:
-                    continue
-                data_types.update(_sequence_data_types(sequence_dir))
-                write_yaml(
-                    sequence_dir / "manifest.yaml",
-                    {
-                        "metadata": {
-                            "difficulty": difficulty,
-                            "trajectory": sequence_dir.name,
-                        },
-                        "tags": ["sequence", difficulty],
-                        "subsets": dict(sorted(stream_subsets.items())),
-                    },
-                )
-                env_sequences.setdefault(env_dir.name, {})[f"{difficulty}/{sequence_dir.name}"] = (
-                    Path(difficulty_dir.name) / sequence_dir.name / "manifest.yaml"
-                ).as_posix()
-                total_streams += len(stream_subsets)
-
-    env_subsets: dict[str, str] = {}
-    for env_name, subsets in sorted(env_sequences.items()):
-        write_yaml(
-            dataset_dir / env_name / "manifest.yaml",
-            {
-                "metadata": {"scene": env_name},
-                "tags": scene_tags(env_name),
-                "subsets": dict(sorted(subsets.items())),
-            },
-        )
-        env_subsets[env_name] = f"{env_name}/manifest.yaml"
-
-    tags: list[str] = []
-    if has_raw:
-        tags.extend(["raw", "multi-camera"])
-    if has_pano:
-        tags.extend(["panorama", "multi-viewpoint"])
-    if not tags:
-        tags = ["tartanair"]
-
-    write_yaml(
-        dataset_dir / "manifest.yaml",
-        {
-            "dataset_name": dataset_name,
-            "dataset_version": "0.1.0",
-            "data_types": sorted(data_types),
-            "metadata": {
-                "dataset_owner": DATASET_OWNER,
-                "pose_coordinate_system": "NED",
-                "pose_convention": "camera_to_world",
-                "pose_units": "meters",
-            },
-            "tags": list(dict.fromkeys(tags)),
-            "subsets": env_subsets,
-        },
-    )
-    return total_streams
-
-
-def merge_stream_manifests(existing_dir: Path, staged_dir: Path) -> None:
-    """Merge leaf stream manifests that would otherwise be overwritten on publish."""
+def merge_manifests(existing_dir: Path, staged_dir: Path) -> None:
+    """Merge staged manifests with matching manifests in an existing dataset."""
     for staged_manifest in sorted(staged_dir.rglob("*.yaml")):
-        if staged_manifest.name == "manifest.yaml":
-            continue
         relative_path = staged_manifest.relative_to(staged_dir)
         existing_manifest = existing_dir / relative_path
         if not existing_manifest.is_file():
             continue
         existing = _read_yaml_mapping(existing_manifest)
         staged = _read_yaml_mapping(staged_manifest)
-        write_yaml(staged_manifest, _merge_stream_payloads(existing, staged, relative_path))
+        if staged_manifest.name == "manifest.yaml":
+            merged = _merge_parent_payloads(existing, staged, relative_path)
+        else:
+            merged = _merge_stream_payloads(existing, staged, relative_path)
+        write_yaml(staged_manifest, merged)
 
 
 def _write_stream_tree(
@@ -247,6 +172,36 @@ def _merge_stream_payloads(
         "metadata": _ordered_metadata(metadata),
         "tags": tags,
         "samples": _ordered_samples(samples),
+    }
+
+
+def _merge_parent_payloads(
+    existing: dict[str, Any],
+    staged: dict[str, Any],
+    relative_path: Path,
+) -> dict[str, Any]:
+    list_keys = {"data_types", "tags"}
+    merged = _merge_mappings(
+        {key: value for key, value in existing.items() if key not in list_keys},
+        {key: value for key, value in staged.items() if key not in list_keys},
+        str(relative_path),
+    )
+    for key in list_keys:
+        if key not in existing and key not in staged:
+            continue
+        values: list[str] = []
+        for payload in (existing, staged):
+            raw_values = payload.get(key, [])
+            if not isinstance(raw_values, list):
+                raise RuntimeError(f"expected {key} list in manifest: {relative_path}")
+            values.extend(str(value) for value in raw_values)
+        merged[key] = sorted(set(values)) if key == "data_types" else list(dict.fromkeys(values))
+
+    preferred = ("dataset_name", "dataset_version", "data_types", "metadata", "tags", "subsets")
+    return {
+        key: merged[key]
+        for key in (*preferred, *sorted(set(merged) - set(preferred)))
+        if key in merged
     }
 
 
@@ -635,24 +590,6 @@ def _folders_resolution(folders: list[Path]) -> list[int] | None:
             if resolution:
                 return resolution
     return None
-
-
-def _sequence_data_types(sequence_dir: Path) -> set[str]:
-    data_types: set[str] = set()
-    for folder in sorted(path for path in sequence_dir.iterdir() if _is_stream_dir(path)):
-        data_type, _, _ = folder.name.partition("_")
-        if data_type:
-            data_types.add(_data_type(data_type))
-    for manifest_path in sorted(sequence_dir.glob("*.yaml")):
-        if manifest_path.name == "manifest.yaml":
-            continue
-        payload = _read_yaml_mapping(manifest_path)
-        samples = payload.get("samples")
-        if isinstance(samples, dict) and any(
-            isinstance(sample, dict) and "camera_pose" in sample for sample in samples.values()
-        ):
-            data_types.add("camera_pose")
-    return data_types
 
 
 def _png_resolution(path: Path) -> list[int] | None:

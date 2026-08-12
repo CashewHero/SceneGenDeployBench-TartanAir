@@ -10,11 +10,13 @@ This repository wraps the TartanAir download and cube-to-panorama conversion pip
 - Kind: `dataset_downloader`
 - Image: `scenegendeploybench-tartanair`
 - Dataset output: `/data/datasets/<dataset>`
-- Job output: `/data/output/tartanair@0.1.3/<dataset>/<environment-or-group>`
+- Job output: `/data/output/tartanair@0.1.4/<dataset>/<environment-or-group>`
 
 Each job writes `runner_260724-153045.log` and `metrics_260724-153045.json`. The metrics file includes the pipeline summary. Multiple environments use a combined folder such as `AbandonedFactory2+Office`. The orchestrator supplies the dataset name in `job.parameters.dataset_name`; the runner publishes the validated dataset under `PATH_DATASETS/<dataset>` with a DeployBench-compatible `manifest.yaml`. Per-job staging stays under `/tmp`.
 
 Manifests include `metadata.dataset_owner: SceneGenDeployBench-TartanAir`. The runner only appends to empty dataset folders or sets with this owner.
+
+Appending a job publishes only its staged data files and merged manifests. Existing dataset payloads are left in place.
 
 ## Build
 
@@ -32,7 +34,7 @@ Then create a download job:
 
 ```bash
 deploybench dataset download tartanair-small \
-  --runner tartanair@0.1.3 \
+  --runner tartanair@0.1.4 \
   --set mode=equirectangular \
   --set env=AbandonedFactory2 \
   --set modality=image \
