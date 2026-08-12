@@ -10,6 +10,11 @@ import torch
 from scipy.spatial.transform import Rotation as R
 
 from tartanair_downloader.config import CUBE_FACES, DownloadConfig
+from tartanair_downloader.depth import (
+    decode_float32_le_bgra,
+    depth_to_ray_distance,
+    encode_float32_le_bgra,
+)
 
 
 _WORLD_VEC_CACHE: dict[tuple[str, int | None, int, int], torch.Tensor] = {}
@@ -214,7 +219,7 @@ def convert_cube_to_pano(
     )
     pano = _cube_to_pano(faces, resolution=resolution, quaternion=pose[3:], modality=modality, cuda=cuda)
     if modality == "depth":
-        pano = _encode_tartanair_depth(pano)
+        pano = encode_float32_le_bgra(pano)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     write_params = [cv2.IMWRITE_PNG_COMPRESSION, max(0, min(9, int(png_compression)))]
     if not cv2.imwrite(str(output_file), pano, write_params):
@@ -245,7 +250,7 @@ def _load_cube_faces(
         if image is None:
             raise FileNotFoundError(f"missing cube face: {file_path}")
         if modality == "depth":
-            image = _decode_tartanair_depth(image)
+            image = depth_to_ray_distance(decode_float32_le_bgra(image))
         faces.append(image)
 
     pose_path = trajectory_dir / f"pose_{camera_prefix}_front.txt"
@@ -328,17 +333,6 @@ def _frame_index(frame_id: str) -> int | None:
 
 def _data_type(modality: str) -> str:
     return "video" if modality == "mp4" else modality
-
-
-def _decode_tartanair_depth(depth_rgba: np.ndarray) -> np.ndarray:
-    if depth_rgba.ndim == 3 and depth_rgba.shape[-1] == 4 and depth_rgba.dtype == np.uint8:
-        return np.squeeze(np.ascontiguousarray(depth_rgba).view("<f4"), axis=-1)
-    return depth_rgba
-
-
-def _encode_tartanair_depth(depth: np.ndarray) -> np.ndarray:
-    depth = np.ascontiguousarray(depth.astype("<f4", copy=False))
-    return depth.view(np.uint8).reshape(depth.shape + (4,))
 
 
 def _world_vecs(resolution: tuple[int, int], device: torch.device) -> torch.Tensor:

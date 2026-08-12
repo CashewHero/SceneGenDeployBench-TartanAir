@@ -10,7 +10,7 @@ This repository wraps the TartanAir download and cube-to-panorama conversion pip
 - Kind: `dataset_downloader`
 - Image: `scenegendeploybench-tartanair`
 - Dataset output: `/data/datasets/<dataset>`
-- Job output: `/data/output/tartanair@0.1.2/<dataset>/<environment-or-group>`
+- Job output: `/data/output/tartanair@0.1.3/<dataset>/<environment-or-group>`
 
 Each job writes `runner_260724-153045.log` and `metrics_260724-153045.json`. The metrics file includes the pipeline summary. Multiple environments use a combined folder such as `AbandonedFactory2+Office`. The orchestrator supplies the dataset name in `job.parameters.dataset_name`; the runner publishes the validated dataset under `PATH_DATASETS/<dataset>` with a DeployBench-compatible `manifest.yaml`. Per-job staging stays under `/tmp`.
 
@@ -32,7 +32,7 @@ Then create a download job:
 
 ```bash
 deploybench dataset download tartanair-small \
-  --runner tartanair@0.1.2 \
+  --runner tartanair@0.1.3 \
   --set mode=equirectangular \
   --set env=AbandonedFactory2 \
   --set modality=image \
@@ -52,6 +52,10 @@ Useful parameters:
 - `pano_convert_workers`: panorama conversion worker count
 - `pano_png_compression`: PNG compression, `0` to `9`
 - `pano_cuda`: `true` or `false`
+
+`raw` publishes TartanAir's downloaded files without changing their values. Its pinhole depth is camera-axis Z-depth and is declared as `representation: camera_z` in stream metadata.
+
+`equirectangular` and `pano_conversion` depth is camera-to-surface ray distance and is declared as `representation: ray_distance`. During `pano_conversion`, TartanAir's cube-face Z-depth is converted to ray distance before spherical resampling.
 
 `pano_conversion` converts requested modalities that TartanAir downloads as six image-readable cube-face folders.
 

@@ -12,8 +12,7 @@ from tartanair_downloader.manifest_common import scene_tags, write_yaml
 
 DEPTH_METADATA = {
     "format": "png",
-    "dtype": "float32",
-    "encoding": "tartanair_float32_rgba",
+    "encoding": "float32_le_bgra",
     "units": "meters",
 }
 DATASET_OWNER = "SceneGenDeployBench-TartanAir"
@@ -345,6 +344,7 @@ def _raw_sequence_streams(sequence_dir: Path, env_name: str, difficulty: str) ->
             continue
         stream = grouped_stream[stream_name]
         data_types = grouped_data_types[stream_name]
+        projection = _projection(stream["projection_raw"])
         streams.append(
             StreamSpec(
                 env_name=env_name,
@@ -354,8 +354,11 @@ def _raw_sequence_streams(sequence_dir: Path, env_name: str, difficulty: str) ->
                 metadata=_stream_metadata(
                     source="tartanair_raw",
                     data_types=data_types,
+                    depth_representation=(
+                        _depth_representation(projection) if "depth" in data_types else None
+                    ),
                     camera_side=_camera_side(stream["camera_side_raw"]),
-                    projection=_projection(stream["projection_raw"]),
+                    projection=projection,
                     cube_face=_cube_face(stream["projection_raw"]),
                     resolution=_folders_resolution(grouped_folders[stream_name]),
                 ),
@@ -400,6 +403,7 @@ def _equirectangular_streams(dataset_dir: Path, config: DownloadConfig) -> list[
                             metadata=_stream_metadata(
                                 source="tartanair_equirectangular",
                                 data_types=set(),
+                                depth_representation="ray_distance",
                                 camera_side=_camera_side(camera_prefix),
                                 projection="equirectangular",
                                 resolution=None,
@@ -420,6 +424,7 @@ def _equirectangular_streams(dataset_dir: Path, config: DownloadConfig) -> list[
                         _stream_metadata(
                             source="tartanair_equirectangular",
                             data_types=stream.data_types,
+                            depth_representation="ray_distance",
                             camera_side=_camera_side(camera_prefix),
                             projection="equirectangular",
                             resolution=stream.metadata.get("resolution") or _folder_resolution(folder),
@@ -465,6 +470,7 @@ def _pano_conversion_streams(
                 metadata=_stream_metadata(
                     source="tartanair_pano_conversion",
                     data_types=data_types,
+                    depth_representation="ray_distance",
                     camera_side=_camera_side_from_stream_name(stream_name),
                     projection="equirectangular",
                     resolution=_folders_resolution(
@@ -539,6 +545,7 @@ def _stream_metadata(
     *,
     source: str,
     data_types: set[str],
+    depth_representation: str | None,
     camera_side: str | None,
     projection: str | None,
     resolution: list[int] | None,
@@ -557,7 +564,14 @@ def _stream_metadata(
     if fov:
         metadata["fov"] = fov
     if "depth" in data_types:
-        metadata["depth"] = dict(DEPTH_METADATA)
+        if not depth_representation:
+            raise ValueError("depth representation is required for a depth stream")
+        metadata["depth"] = {
+            "format": DEPTH_METADATA["format"],
+            "encoding": DEPTH_METADATA["encoding"],
+            "representation": depth_representation,
+            "units": DEPTH_METADATA["units"],
+        }
     return metadata
 
 
@@ -584,6 +598,14 @@ def _projection(value: str) -> str | None:
     if value in {"equirect", "equirectangular", "pano_conversion"}:
         return "equirectangular"
     return None
+
+
+def _depth_representation(projection: str | None) -> str:
+    if projection == "pinhole":
+        return "camera_z"
+    if projection in {"fisheye", "equirectangular"}:
+        return "ray_distance"
+    raise ValueError(f"cannot determine raw depth representation for projection {projection!r}")
 
 
 def _cube_face(value: str) -> str | None:
